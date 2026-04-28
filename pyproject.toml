@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "interp_research"
+version = "0.1.0"
+description = "Quantitative comparison of interpolation methods on sailing GPS tracks (bachelor's thesis research subproject)."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Parfenov Mikhail", email = "mishaslsk@gmail.com" }]
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+    "pandas>=2.1",
+    "gpxpy>=1.6",
+    "jupyter>=1.0",
+    "jupytext>=1.16",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/interp_research"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
