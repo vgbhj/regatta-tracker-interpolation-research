@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from interp_research.methods import linear, lagrange
+from interp_research.methods import linear, lagrange, cubic_spline, b_spline
+from interp_research.numeric import tridiagonal_solve
 
 
 # ── Линейная интерполяция ────────────────────────────────────────────
@@ -66,3 +67,97 @@ class TestLagrange:
         t_q = np.array([0.5, 1.5, 3.5])
         result = lagrange.interpolate(t, x, t_q, degree=1)
         np.testing.assert_allclose(result, 2.0 * t_q + 1.0, atol=1e-14)
+
+
+# ── Метод прогонки ───────────────────────────────────────────────────
+
+
+class TestTridiagonalSolve:
+    """Тест на известном решении трёхдиагональной системы."""
+
+    def test_known_system(self):
+        # Система 4×4:
+        # [2 1 0 0] [x0]   [1]
+        # [1 3 1 0] [x1] = [2]
+        # [0 1 3 1] [x2]   [3]
+        # [0 0 1 2] [x3]   [4]
+        a = np.array([0.0, 1.0, 1.0, 1.0])
+        b = np.array([2.0, 3.0, 3.0, 2.0])
+        c = np.array([1.0, 1.0, 1.0, 0.0])
+        d = np.array([1.0, 2.0, 3.0, 4.0])
+
+        x = tridiagonal_solve(a, b, c, d)
+
+        A = np.array([
+            [2, 1, 0, 0],
+            [1, 3, 1, 0],
+            [0, 1, 3, 1],
+            [0, 0, 1, 2],
+        ], dtype=float)
+        x_ref = np.linalg.solve(A, d)
+        np.testing.assert_allclose(x, x_ref, atol=1e-14)
+
+    def test_identity_like(self):
+        n = 10
+        a = np.zeros(n)
+        b = np.ones(n)
+        c = np.zeros(n)
+        d = np.arange(n, dtype=float)
+        x = tridiagonal_solve(a, b, c, d)
+        np.testing.assert_allclose(x, d, atol=1e-15)
+
+
+# ── Кубический сплайн ───────────────────────────────────────────────
+
+
+class TestCubicSpline:
+    """Cross-check собственной реализации с scipy + тест на sin."""
+
+    def test_cross_check_with_scipy(self):
+        rng = np.random.default_rng(123)
+        t = np.sort(rng.uniform(0, 10, 20))
+        x = np.sin(t)
+        t_q = np.linspace(t[0], t[-1], 200)
+
+        own = cubic_spline.interpolate(t, x, t_q)
+        ref = cubic_spline.interpolate_scipy(t, x, t_q)
+        np.testing.assert_allclose(own, ref, atol=1e-9)
+
+    def test_sin_rmse(self):
+        t = np.linspace(0, 2 * np.pi, 30)
+        x = np.sin(t)
+        t_q = np.linspace(0, 2 * np.pi, 500)
+        x_exact = np.sin(t_q)
+
+        result = cubic_spline.interpolate(t, x, t_q)
+        rmse = np.sqrt(np.mean((result - x_exact) ** 2))
+        assert rmse < 1e-3, f"RMSE слишком большой: {rmse}"
+
+    def test_at_nodes(self):
+        t = np.linspace(0, 5, 15)
+        x = np.cos(t)
+        result = cubic_spline.interpolate(t, x, t)
+        np.testing.assert_allclose(result, x, atol=1e-12)
+
+
+# ── B-сплайн ────────────────────────────────────────────────────────
+
+
+class TestBSpline:
+    """Тест B-сплайна на гладкой функции."""
+
+    def test_sin_rmse(self):
+        t = np.linspace(0, 2 * np.pi, 30)
+        x = np.sin(t)
+        t_q = np.linspace(0, 2 * np.pi, 500)
+        x_exact = np.sin(t_q)
+
+        result = b_spline.interpolate(t, x, t_q)
+        rmse = np.sqrt(np.mean((result - x_exact) ** 2))
+        assert rmse < 1e-3, f"RMSE слишком большой: {rmse}"
+
+    def test_at_nodes(self):
+        t = np.linspace(0, 5, 15)
+        x = np.cos(t)
+        result = b_spline.interpolate(t, x, t)
+        np.testing.assert_allclose(result, x, atol=1e-12)
