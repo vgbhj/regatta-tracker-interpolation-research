@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from interp_research.methods import linear, lagrange, cubic_spline, b_spline
+from interp_research.methods import linear, lagrange, cubic_spline, b_spline, motion_aware
 from interp_research.numeric import tridiagonal_solve
 
 
@@ -160,4 +160,38 @@ class TestBSpline:
         t = np.linspace(0, 5, 15)
         x = np.cos(t)
         result = b_spline.interpolate(t, x, t)
+        np.testing.assert_allclose(result, x, atol=1e-12)
+
+
+# ── Motion-aware (эрмитова интерполяция) ─────────────────────────────
+
+
+class TestMotionAware:
+    """Тест на параметрической кривой (cos t, sin t)."""
+
+    def test_circle_rmse_accurate(self):
+        """Оба метода точны на (cos t, sin t); motion_aware — в том же порядке."""
+        t = np.linspace(0, 2 * np.pi, 40)
+        t_q = np.linspace(0, 2 * np.pi, 500)
+
+        for coord_fn in [np.cos, np.sin]:
+            x = coord_fn(t)
+            x_exact = coord_fn(t_q)
+
+            rmse_ma = np.sqrt(np.mean((motion_aware.interpolate(t, x, t_q) - x_exact) ** 2))
+            rmse_cs = np.sqrt(np.mean((cubic_spline.interpolate(t, x, t_q) - x_exact) ** 2))
+            assert rmse_ma < 1e-3, f"motion_aware RMSE слишком большой: {rmse_ma:.2e}"
+            assert rmse_cs < 1e-3, f"cubic_spline RMSE слишком большой: {rmse_cs:.2e}"
+            # На гладких данных кубический сплайн оптимизирует вторые производные
+            # глобально, поэтому может быть точнее. Проверяем, что motion_aware
+            # остаётся в пределах двух порядков — разумная близость.
+            assert rmse_ma < rmse_cs * 100, (
+                f"motion_aware RMSE ({rmse_ma:.2e}) на порядки хуже "
+                f"cubic_spline ({rmse_cs:.2e})"
+            )
+
+    def test_at_nodes(self):
+        t = np.linspace(0, 5, 15)
+        x = np.cos(t)
+        result = motion_aware.interpolate(t, x, t)
         np.testing.assert_allclose(result, x, atol=1e-12)
