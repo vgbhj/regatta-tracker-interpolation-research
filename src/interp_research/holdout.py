@@ -1,4 +1,4 @@
-"""Разбиение данных на обучающую и удержанную выборки."""
+"""Разбиение данных на узлы интерполяции и контрольные точки."""
 
 import numpy as np
 from numpy.typing import NDArray
@@ -9,30 +9,31 @@ def holdout_split(
     x: NDArray[np.float64],
     step: int,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
-    """Разбивает временной ряд на обучающую и тестовую выборки.
+    """Разбивает временной ряд на узлы интерполяции и контрольные точки.
 
-    Каждая ``step``-я точка (начиная с индекса ``step - 1``) попадает
-    в тестовую выборку, остальные — в обучающую.
+    Каждая ``step``-я точка (начиная с индекса 0) **остаётся** как узел
+    интерполяции, все промежуточные становятся контрольными.
+    Контрольные точки после последнего узла отбрасываются (нельзя
+    экстраполировать).
 
     Parameters
     ----------
     t : массив временных меток
     x : массив значений координаты
-    step : шаг прореживания (каждая step-я точка — тестовая)
+    step : шаг прореживания (каждая step-я точка — узел)
 
     Returns
     -------
-    (t_train, x_train, t_test, x_test)
+    (t_known, x_known, t_held, x_held)
     """
-    mask_test = np.zeros(len(t), dtype=bool)
-    mask_test[step - 1 :: step] = True
+    n = len(t)
+    mask_known = np.zeros(n, dtype=bool)
+    mask_known[::step] = True
+    last_known = np.max(np.nonzero(mask_known))
+    mask_held = ~mask_known
+    mask_held[last_known:] = False
 
-    t_train = t[~mask_test]
-    x_train = x[~mask_test]
-    t_test = t[mask_test]
-    x_test = x[mask_test]
-
-    return t_train, x_train, t_test, x_test
+    return t[mask_known], x[mask_known], t[mask_held], x[mask_held]
 
 
 def holdout_split_2d(
@@ -48,22 +49,26 @@ def holdout_split_2d(
     NDArray[np.float64],
     NDArray[np.float64],
 ]:
-    """Разбивает двумерный временной ряд на обучающую и тестовую выборки.
+    """Разбивает двумерный временной ряд на узлы интерполяции и контрольные точки.
 
     Аналог :func:`holdout_split` для пары координат (x, y).
 
     Returns
     -------
-    (t_train, x_train, y_train, t_test, x_test, y_test)
+    (t_known, x_known, y_known, t_held, x_held, y_held)
     """
-    mask_test = np.zeros(len(t), dtype=bool)
-    mask_test[step - 1 :: step] = True
+    n = len(t)
+    mask_known = np.zeros(n, dtype=bool)
+    mask_known[::step] = True
+    last_known = np.max(np.nonzero(mask_known))
+    mask_held = ~mask_known
+    mask_held[last_known:] = False
 
     return (
-        t[~mask_test],
-        x[~mask_test],
-        y[~mask_test],
-        t[mask_test],
-        x[mask_test],
-        y[mask_test],
+        t[mask_known],
+        x[mask_known],
+        y[mask_known],
+        t[mask_held],
+        x[mask_held],
+        y[mask_held],
     )
